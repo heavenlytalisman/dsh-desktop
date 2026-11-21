@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DSH Desktop</title>
+    <style>
+      :root {
+        --titlebar-height: 36px;
+        --bg: #151517;
+        --fg: #f9fafb;
+        --line: rgba(255, 255, 255, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      #titlebar {
+        height: var(--titlebar-height);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--line);
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #traffic {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #traffic button {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+      }
+      #traffic .close {
+        background: #ff5f57;
+      }
+      #traffic .min {
+        background: #febc2e;
+      }
+      #traffic .max {
+        background: #28c840;
+      }
+      #drag {
+        flex: 1;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        opacity: 0.8;
+      }
+      #error {
+        position: fixed;
+        inset: var(--titlebar-height) 0 0 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        font-size: 14px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        background: var(--bg);
+      }
+    </style>
+  </head>
+  <body>
+    <header id="titlebar">
+      <div id="traffic">
+        <button class="close" id="close" title="Close" aria-label="Close"></button>
+        <button class="min" id="min" title="Minimize" aria-label="Minimize"></button>
+        <button class="max" id="max" title="Maximize" aria-label="Maximize"></button>
+      </div>
+      <div id="drag" data-tauri-drag-region>DSH Desktop</div>
+    </header>
+    <div id="error"></div>
+    <script>
+      const tauri = window.__TAURI__
+      if (tauri) {
+        const window = tauri.window.getCurrentWindow()
+        document.getElementById('close').onclick = () => window.close()
+        document.getElementById('min').onclick = () => window.minimize()
+        document.getElementById('max').onclick = () => window.toggleMaximize()
+      }
+      window.__DSH_SHELL__ = {
+        showError(message) {
+          const error = document.getElementById('error')
+          error.textContent = message
+          error.style.display = 'flex'
+        },
+      }
+    </script>
+  </body>
+</html>
