@@ -43,7 +43,7 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             tray::create(&handle)?;
-            std::thread::spawn(move || match dsh::spawn() {
+            match dsh::spawn() {
                 Ok((child, url)) => {
                     DSH_PID.store(child.id() as i32, Ordering::SeqCst);
                     if let Some(state) = handle.try_state::<DshChild>() {
@@ -54,7 +54,7 @@ pub fn run() {
                     }
                 }
                 Err(error) => eprintln!("failed to spawn dsh: {error}"),
-            });
+            }
             Ok(())
         })
         .build(tauri::generate_context!())

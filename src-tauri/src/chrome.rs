@@ -14,10 +14,14 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
 
     // System-default window decorations (native title bar). No custom
     // title bar — the dsh web page loads directly.
-    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(content_url))
+    // Create window with local HTML first (avoids Wayland 0x0 size bug
+    // when loading an external URL directly), then navigate to dsh.
+    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("DSH Desktop")
         .inner_size(1280.0, 860.0)
         .center()
+        .resizable(true)
+        .visible(true)
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -28,6 +32,9 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
             let _ = window2.hide();
         }
     });
+
+    // Navigate the webview to the dsh URL now that the window has a size.
+    window.navigate(content_url.clone()).map_err(|e| e.to_string())?;
 
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
