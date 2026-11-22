@@ -27,6 +27,10 @@ extern "C" fn on_terminate(_signal: libc::c_int) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK on Wayland: disable DMA-BUF renderer and compositing mode
+    // to fix black glitches in animations (e.g. the dsh whale animation).
+    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGTERM, on_terminate as *const () as libc::sighandler_t);
