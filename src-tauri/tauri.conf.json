@@ -4,25 +4,12 @@
   "version": "0.1.0",
   "identifier": "com.heavenlytalisman.dshdesktop",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "pnpm exec vite",
     "beforeBuildCommand": "pnpm exec vite build"
   },
   "app": {
-    "withGlobalTauri": true,
-    "windows": [
-      {
-        "label": "main",
-        "title": "DSH Desktop",
-        "width": 1280,
-        "height": 860,
-        "center": true,
-        "decorations": false,
-        "resizable": true,
-        "url": "index.html"
-      }
-    ],
     "security": {
       "csp": null
     }

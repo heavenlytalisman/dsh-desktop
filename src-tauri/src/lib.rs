@@ -16,7 +16,7 @@ impl Default for DshChild {
 
 static DSH_PID: AtomicI32 = AtomicI32::new(0);
 
-/// `RunEvent::Exit` does not run on SIGTERM, so kill the spawned host here too.
+// `RunEvent::Exit` does not run on SIGTERM, so kill the spawned host here too.
 extern "C" fn on_terminate(_signal: libc::c_int) {
     let pid = DSH_PID.load(Ordering::SeqCst);
     if pid > 0 {
@@ -42,7 +42,6 @@ pub fn run() {
         .manage(DshChild::default())
         .setup(|app| {
             let handle = app.handle().clone();
-            chrome::setup_main_window(&handle)?;
             tray::create(&handle)?;
             std::thread::spawn(move || match dsh::spawn() {
                 Ok((child, url)) => {
@@ -50,11 +49,11 @@ pub fn run() {
                     if let Some(state) = handle.try_state::<DshChild>() {
                         *state.0.lock().expect("dsh child lock poisoned") = Some(child);
                     }
-                    if let Err(error) = chrome::attach_content(&handle, &url) {
-                        chrome::show_error(&handle, &error);
+                    if let Err(error) = chrome::open_main_window(&handle, &url) {
+                        eprintln!("failed to open main window: {error}");
                     }
                 }
-                Err(error) => chrome::show_error(&handle, &error.to_string()),
+                Err(error) => eprintln!("failed to spawn dsh: {error}"),
             });
             Ok(())
         })

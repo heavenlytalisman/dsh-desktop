@@ -1,72 +1,35 @@
-use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl, WindowEvent,
-};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-const TITLEBAR_HEIGHT: f64 = 36.0;
+pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
+    // Single instance: if a main window already exists, just focus it.
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return Ok(());
+    }
 
-pub fn setup_main_window(app: &AppHandle) -> Result<(), String> {
-    let window = app
-        .get_window("main")
-        .ok_or_else(|| "main window is missing".to_string())?;
-    let app_for_resize = app.clone();
-    let window_for_resize = window.clone();
-    window.on_window_event(move |event| match event {
-        WindowEvent::CloseRequested { api, .. } => {
-            api.prevent_close();
-            let _ = window_for_resize.hide();
-        }
-        WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
-            if let Some(content) = app_for_resize.get_webview("content") {
-                if let Ok((position, size)) = content_area(&window_for_resize) {
-                    let _ = content.set_position(position);
-                    let _ = content.set_size(size);
-                }
-            }
-        }
-        _ => {}
-    });
-    Ok(())
-}
-
-pub fn attach_content(app: &AppHandle, url: &str) -> Result<(), String> {
-    let window = app
-        .get_window("main")
-        .ok_or_else(|| "main window is missing".to_string())?;
     let content_url = url
         .parse::<url::Url>()
         .map_err(|_| format!("invalid dsh URL: {url}"))?;
-    let (position, size) = content_area(&window)?;
-    let content = window
-        .add_child(
-            WebviewBuilder::new("content", WebviewUrl::External(content_url)),
-            position,
-            size,
-        )
-        .map_err(|error| error.to_string())?;
+
+    // System-default window decorations (native title bar). No custom
+    // title bar — the dsh web page loads directly.
+    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(content_url))
+        .title("DSH Desktop")
+        .inner_size(1280.0, 860.0)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let window2 = window.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = window2.hide();
+        }
+    });
+
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
-}
-
-pub fn show_error(app: &AppHandle, message: &str) {
-    let Some(webview) = app.get_webview("main") else {
-        eprintln!("{message}");
-        return;
-    };
-    let script = format!(
-        "window.__DSH_SHELL__?.showError({});",
-        serde_json::to_string(message).unwrap_or_else(|_| "\"dsh failed\"".into())
-    );
-    let _ = webview.eval(&script);
-}
-
-fn content_area(
-    window: &tauri::Window,
-) -> Result<(LogicalPosition<f64>, LogicalSize<f64>), String> {
-    let scale = window.scale_factor().map_err(|error| error.to_string())?;
-    let inner = window.inner_size().map_err(|error| error.to_string())?;
-    let size: LogicalSize<f64> = inner.to_logical(scale);
-    let height = (size.height - TITLEBAR_HEIGHT).max(0.0);
-    Ok((
-        LogicalPosition::new(0.0, TITLEBAR_HEIGHT),
-        LogicalSize::new(size.width, height),
-    ))
 }
