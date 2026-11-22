@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.heavenlytalisman.dshdesktop",
   "build": {
-    "frontendDist": "dist",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "pnpm exec vite",
     "beforeBuildCommand": "pnpm exec vite build"
