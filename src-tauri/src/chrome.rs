@@ -39,6 +39,7 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("DSH Desktop")
         .inner_size(w, h)
+        .min_inner_size(640.0, 480.0)
         .resizable(true)
         .visible(true);
 
@@ -73,6 +74,54 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
 
     // Navigate the webview to the dsh URL now that the window has a size.
     window.navigate(content_url.clone()).map_err(|e| e.to_string())?;
+
+    // Inject CSS optimizations after the page loads.
+    let css = r#"
+        (function() {
+            const style = document.createElement('style');
+            style.id = 'dsh-desktop-opt';
+            style.textContent = `
+                html {
+                    -webkit-font-smoothing: antialiased !important;
+                    -moz-osx-font-smoothing: grayscale !important;
+                    text-rendering: optimizeLegibility !important;
+                }
+                * {
+                    -webkit-font-smoothing: antialiased;
+                }
+                /* Smooth scrolling */
+                html, body {
+                    scroll-behavior: smooth !important;
+                }
+                /* Reduce motion for performance on lower-end systems */
+                @media (prefers-reduced-motion: reduce) {
+                    *, *::before, *::after {
+                        animation-duration: 0.01ms !important;
+                        animation-iteration-count: 1 !important;
+                        transition-duration: 0.01ms !important;
+                    }
+                }
+            `;
+            const inject = () => {
+                if (document.head && !document.getElementById('dsh-desktop-opt')) {
+                    document.head.appendChild(style);
+                }
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', inject, { once: true });
+            } else {
+                inject();
+            }
+            // Re-inject on navigation (SPA route changes)
+            const observer = new MutationObserver(() => {
+                if (!document.getElementById('dsh-desktop-opt')) inject();
+            });
+            if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
+        })();
+    "#;
+    let _ = window.eval(css);
 
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;

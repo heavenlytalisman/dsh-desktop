@@ -6,7 +6,7 @@
 #
 set -euo pipefail
 
-REPO="heavenlytalisman/dsh-desktop"
+REPO="heavenlytalisman/dsh-desktop-linux"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 DESKTOP_DIR="${DESKTOP_DIR:-$HOME/.local/share/applications}"
 APP_NAME="DSH Desktop"

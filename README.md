@@ -1,64 +1,108 @@
 # DSH Desktop
 
-A Linux desktop shell for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`), built with Tauri 2 and Rust.
+<p align="center">
+  <img src="src-tauri/icons/icon.png" width="96" alt="DSH Desktop" />
+</p>
 
-It looks like the official DeepSeek Harness desktop app: a native window (system title bar + traffic lights) hosting the real `dsh web` UI, plus a system tray. Nothing in `dsh` is modified or reimplemented — the upstream web UI is used as-is, so sessions, models, settings and plugins are shared with the CLI and `dsh web`.
+<p align="center">
+  <strong>Linux desktop shell for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a></strong><br />
+  Built with Tauri 2 & Rust · Embeds the real <code>dsh web</code> UI
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-171513.svg" /></a>
+  <img alt="Platform" src="https://img.shields.io/badge/Platform-Linux-171513.svg" />
+  <img alt="Tauri" src="https://img.shields.io/badge/Tauri-2.x-171513.svg" />
+</p>
+
+---
+
+## Overview
+
+DSH Desktop is a lightweight native shell that hosts the DeepSeek Harness web UI in a desktop window. It does not reimplement or modify `dsh` — the upstream web UI runs as-is, sharing sessions, models, settings, and plugins with the CLI.
+
+## What DSH Desktop adds
+
+DeepSeek Harness provides the Agent runtime, Web UI, and basic model-provider integration. DSH Desktop builds on these foundations with:
+
+- **Managed Harness lifecycle**: starts `dsh web` on launch, stops it on quit, and cleans up on exit
+- **Native window management**: system title bar, resizable window, remembers size and position across sessions
+- **System tray integration**: show, hide, and quit from the tray icon; clicking the tray toggles window visibility
+- **Single instance**: clicking the app icon focuses the existing window instead of launching a duplicate
+- **Close to tray**: closing the window hides it to the tray rather than terminating; quit explicitly from the tray menu
+- **Environment detection**: locates `dsh` and `node` even when launched from app drawer or systemd (minimal PATH)
+- **Wayland support**: works on KDE Wayland with proper window sizing and rendering (WebKitGTK DMA-BUF fixes)
+- **Error recovery**: shows an error window if `dsh` fails to start instead of failing silently
+
+## About
+
+DSH Desktop is an independent community project — not affiliated with or endorsed by DeepSeek. It wraps the official DeepSeek Harness web UI in a native Linux window, adding system tray, window management, and desktop integration. All agent, model, tool, and session logic is provided by `dsh` itself.
 
 ## Install
 
-The easiest way is the one-line installer, which downloads the latest AppImage release and installs it to `~/.local/bin` (no root required):
+### One-line installer
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/heavenlytalisman/dsh-desktop/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/heavenlytalisman/dsh-desktop-linux/main/install.sh | bash
 ```
 
-This also writes a desktop entry so **DSH Desktop appears in your app menu and can be pinned to the taskbar**.
-
-Launch it from your app menu or run:
-
-```bash
-~/.local/bin/dsh-desktop
-```
+Downloads the latest release to `~/.local/bin`, writes a desktop entry so DSH Desktop appears in your app menu and can be pinned to the taskbar.
 
 ### Manual install
 
-**Fedora/RHEL** (recommended, no extraction overhead):
-```bash
-sudo dnf install ./DSH-Desktop-*.rpm
-```
-
-**Debian/Ubuntu**:
-```bash
-sudo apt install ./DSH-Desktop-*.deb
-```
-
-**Other distros** (AppImage):
-```bash
-chmod +x DSH\ Desktop-*.AppImage
-./DSH\ Desktop-*.AppImage
-```
+| Distro | Command |
+|---|---|
+| Fedora / RHEL | `sudo dnf install ./DSH-Desktop-*.rpm` |
+| Debian / Ubuntu | `sudo apt install ./DSH-Desktop-*.deb` |
+| Other (AppImage) | `chmod +x DSH\ Desktop-*.AppImage && ./DSH\ Desktop-*.AppImage` |
 
 ### Build from source
 
-Requires `dsh` installed and Tauri 2 Linux build dependencies:
-
 ```bash
+# Dependencies (Fedora)
 sudo dnf install -y webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel patchelf
+
+# Build
 pnpm install
 pnpm tauri build
 ```
 
-Bundles are written to `src-tauri/target/release/bundle/` (`AppImage`, `deb`).
+Bundles are written to `src-tauri/target/release/bundle/` (`AppImage`, `deb`, `rpm`).
 
+## Requirements
+
+- `dsh` installed (`npm install -g @deepseek-ai/dsh`)
+- Node.js 22+ (via fnm, nvm, or system)
 
 ## How it works
 
-On startup the shell spawns `dsh web --no-open --port 0` and reads the authenticated URL that `dsh web` prints (`dsh web: http://127.0.0.1:<port>/?token=…`). That URL is loaded in a child webview, which keeps `dsh`'s `SameSite=Strict` authentication cookie first-party. Closing the window hides it to the tray; quitting from the tray stops the `dsh` process the shell started.
+1. On startup, finds `dsh` and `node` on `PATH` (or common locations like fnm/nvm)
+2. Spawns `dsh web --no-open --port 0`
+3. Reads the authenticated URL from stdout (`dsh web: http://127.0.0.1:<port>/?token=…`)
+4. Loads it in the main webview
+5. **Close** → hides to tray | **Quit from tray** → stops dsh
 
-## Scope
+## Data & security
 
-v1 is the shell only: window, tray, single instance. It does not bundle Node.js or `dsh`, does not attach to an already-running `dsh web`, and does not add notifications or auto-update.
+- Sessions and configuration stay in `~/.dsh` — the same directory used by the CLI
+- No data is sent to external services by the shell itself; network requests are made by `dsh` according to your model provider configuration
+- The shell does not modify, intercept, or proxy `dsh` traffic
+
+## Platform support
+
+| Platform | Status |
+|---|---|
+| Linux (x86_64) | Supported (AppImage, deb, rpm) |
+| Linux (aarch64) | Not tested |
+| macOS / Windows | Not supported (use official clients) |
+
+## Development
+
+```bash
+pnpm install
+pnpm tauri dev
+```
 
 ## License
 
-MIT. DeepSeek Harness and its web UI are the property of their respective owners and are redistributed under their own license.
+MIT — DeepSeek Harness and its web UI are the property of their respective owners.
