@@ -6,12 +6,19 @@
     <title>DSH Desktop</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
+      html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        font-feature-settings: "kern" 1, "liga" 1;
+        font-variant-ligatures: common-ligatures;
+      }
       html, body {
         height: 100%;
         overflow: hidden;
         background: #151517;
         color: #f9fafb;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-family: "Noto Sans", "Liberation Sans", "DejaVu Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         display: flex;
         align-items: center;
         justify-content: center;
