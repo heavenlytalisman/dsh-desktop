@@ -5,103 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DSH Desktop</title>
     <style>
-      :root {
-        --titlebar-height: 36px;
-        --bg: #151517;
-        --fg: #f9fafb;
-        --line: rgba(255, 255, 255, 0.08);
-      }
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        margin: 0;
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
         height: 100%;
         overflow: hidden;
-        background: var(--bg);
-        color: var(--fg);
+        background: #151517;
+        color: #f9fafb;
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      }
-      #titlebar {
-        height: var(--titlebar-height);
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 0 12px;
-        border-bottom: 1px solid var(--line);
-        user-select: none;
-        -webkit-user-select: none;
+        justify-content: center;
       }
-      #traffic {
+      .loader {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 8px;
+        gap: 16px;
       }
-      #traffic button {
-        width: 12px;
-        height: 12px;
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #3b82f6;
         border-radius: 50%;
-        border: 0;
-        padding: 0;
-        cursor: pointer;
+        animation: spin 0.8s linear infinite;
       }
-      #traffic .close {
-        background: #ff5f57;
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
-      #traffic .min {
-        background: #febc2e;
-      }
-      #traffic .max {
-        background: #28c840;
-      }
-      #drag {
-        flex: 1;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        font-size: 12px;
+      .title {
+        font-size: 14px;
         font-weight: 600;
         opacity: 0.8;
       }
-      #error {
-        position: fixed;
-        inset: var(--titlebar-height) 0 0 0;
+      .error {
         display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
+        max-width: 480px;
         text-align: center;
-        font-size: 14px;
+        font-size: 13px;
         line-height: 1.5;
         white-space: pre-wrap;
-        background: var(--bg);
+        color: #f25a5a;
       }
     </style>
   </head>
   <body>
-    <header id="titlebar">
-      <div id="traffic">
-        <button class="close" id="close" title="Close" aria-label="Close"></button>
-        <button class="min" id="min" title="Minimize" aria-label="Minimize"></button>
-        <button class="max" id="max" title="Maximize" aria-label="Maximize"></button>
-      </div>
-      <div id="drag" data-tauri-drag-region>DSH Desktop</div>
-    </header>
-    <div id="error"></div>
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <div class="title">DSH Desktop</div>
+    </div>
+    <div class="error" id="error"></div>
     <script>
-      const tauri = window.__TAURI__
-      if (tauri) {
-        const window = tauri.window.getCurrentWindow()
-        document.getElementById('close').onclick = () => window.close()
-        document.getElementById('min').onclick = () => window.minimize()
-        document.getElementById('max').onclick = () => window.toggleMaximize()
-      }
       window.__DSH_SHELL__ = {
         showError(message) {
-          const error = document.getElementById('error')
-          error.textContent = message
-          error.style.display = 'flex'
+          document.getElementById('loader').style.display = 'none'
+          const err = document.getElementById('error')
+          err.textContent = message
+          err.style.display = 'block'
         },
       }
     </script>
