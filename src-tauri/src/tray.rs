@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle,
+    AppHandle, Manager,
 };
 
 pub fn create(app: &AppHandle) -> Result<(), String> {

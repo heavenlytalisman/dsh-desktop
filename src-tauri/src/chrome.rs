@@ -6,11 +6,11 @@ const TITLEBAR_HEIGHT: f64 = 36.0;
 
 pub fn setup_main_window(app: &AppHandle) -> Result<(), String> {
     let window = app
-        .get_webview_window("main")
+        .get_window("main")
         .ok_or_else(|| "main window is missing".to_string())?;
     let app_for_resize = app.clone();
     let window_for_resize = window.clone();
-    window.on_window_event(move |_, event| match event {
+    window.on_window_event(move |event| match event {
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
             let _ = window_for_resize.hide();
@@ -30,13 +30,13 @@ pub fn setup_main_window(app: &AppHandle) -> Result<(), String> {
 
 pub fn attach_content(app: &AppHandle, url: &str) -> Result<(), String> {
     let window = app
-        .get_webview_window("main")
+        .get_window("main")
         .ok_or_else(|| "main window is missing".to_string())?;
     let content_url = url
         .parse::<url::Url>()
         .map_err(|_| format!("invalid dsh URL: {url}"))?;
     let (position, size) = content_area(&window)?;
-    window
+    let content = window
         .add_child(
             WebviewBuilder::new("content", WebviewUrl::External(content_url)),
             position,
@@ -47,7 +47,7 @@ pub fn attach_content(app: &AppHandle, url: &str) -> Result<(), String> {
 }
 
 pub fn show_error(app: &AppHandle, message: &str) {
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(webview) = app.get_webview("main") else {
         eprintln!("{message}");
         return;
     };
@@ -55,17 +55,15 @@ pub fn show_error(app: &AppHandle, message: &str) {
         "window.__DSH_SHELL__?.showError({});",
         serde_json::to_string(message).unwrap_or_else(|_| "\"dsh failed\"".into())
     );
-    let _ = window.eval(&script);
+    let _ = webview.eval(&script);
 }
 
 fn content_area(
     window: &tauri::Window,
 ) -> Result<(LogicalPosition<f64>, LogicalSize<f64>), String> {
     let scale = window.scale_factor().map_err(|error| error.to_string())?;
-    let size = window
-        .inner_size()
-        .map_err(|error| error.to_string())?
-        .to_logical(scale);
+    let inner = window.inner_size().map_err(|error| error.to_string())?;
+    let size: LogicalSize<f64> = inner.to_logical(scale);
     let height = (size.height - TITLEBAR_HEIGHT).max(0.0);
     Ok((
         LogicalPosition::new(0.0, TITLEBAR_HEIGHT),

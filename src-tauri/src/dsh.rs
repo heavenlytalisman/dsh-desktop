@@ -52,8 +52,6 @@ pub fn spawn() -> std::io::Result<(Child, String)> {
         }
     };
     // Drain the rest of stdout so dsh never blocks on a full pipe.
-    std::thread::spawn(move || {
-        for _ in lines {}
-    });
+    std::thread::spawn(move || for _ in lines {});
     Ok((child, url))
 }
