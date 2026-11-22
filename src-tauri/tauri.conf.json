@@ -16,7 +16,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["appimage", "deb"],
+    "targets": ["appimage", "deb", "rpm"],
     "category": "DeveloperTool",
     "shortDescription": "Linux desktop shell for DeepSeek Harness",
     "icon": [
@@ -28,6 +28,9 @@
     "linux": {
       "deb": {
         "depends": ["webkit2gtk4.1", "libappindicator3-1"]
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "libappindicator-gtk3"]
       }
     }
   }

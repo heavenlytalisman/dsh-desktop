@@ -22,8 +22,17 @@ Launch it from your app menu or run:
 
 ### Manual install
 
-Download the latest `DSH Desktop-*.AppImage` from [GitHub Releases](https://github.com/heavenlytalisman/dsh-desktop/releases), make it executable, and run it:
+**Fedora/RHEL** (recommended, no extraction overhead):
+```bash
+sudo dnf install ./DSH-Desktop-*.rpm
+```
 
+**Debian/Ubuntu**:
+```bash
+sudo apt install ./DSH-Desktop-*.deb
+```
+
+**Other distros** (AppImage):
 ```bash
 chmod +x DSH\ Desktop-*.AppImage
 ./DSH\ Desktop-*.AppImage

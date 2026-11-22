@@ -31,6 +31,10 @@ pub fn run() {
     // to fix black glitches in animations (e.g. the dsh whale animation).
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    // Performance: disable TPM (reduces overhead), use cairo renderer
+    // (more stable than NGL on some drivers).
+    std::env::set_var("WEBKIT_DISABLE_TPM", "1");
+    std::env::set_var("GSK_RENDERER", "cairo");
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGTERM, on_terminate as *const () as libc::sighandler_t);
