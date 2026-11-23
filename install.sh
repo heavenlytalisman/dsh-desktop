@@ -31,15 +31,35 @@ if [ -z "$APP_IMAGE_URL" ]; then
   exit 1
 fi
 
+# Verify the download URL points to the expected repository.
+case "$APP_IMAGE_URL" in
+  https://github.com/${REPO}/releases/download/*) ;;
+  *) echo "ERROR: unexpected download URL: $APP_IMAGE_URL"; exit 1 ;;
+esac
+
 echo "==> Downloading $APP_IMAGE_URL"
 mkdir -p "$INSTALL_DIR" "$DESKTOP_DIR"
 
 TMP_APP="$(mktemp)"
+trap 'rm -f "$TMP_APP"' EXIT
 curl -fsSL "$APP_IMAGE_URL" -o "$TMP_APP"
 chmod +x "$TMP_APP"
 
+# Verify SHA256 if a checksum file is available in the release.
+SHA256_URL="${APP_IMAGE_URL%.AppImage}.sha256"
+if curl -fsSL "$SHA256_URL" -o /dev/null 2>/dev/null; then
+  EXPECTED_SHA="$(curl -fsSL "$SHA256_URL" | awk '{print $1}')"
+  ACTUAL_SHA="$(sha256sum "$TMP_APP" | awk '{print $1}')"
+  if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+    echo "ERROR: checksum mismatch (expected $EXPECTED_SHA, got $ACTUAL_SHA)"
+    exit 1
+  fi
+  echo "==> Checksum verified"
+fi
+
 DEST="$INSTALL_DIR/dsh-desktop"
 mv -f "$TMP_APP" "$DEST"
+trap - EXIT
 
 # Write a desktop entry so the app appears in the app menu and can be pinned
 # to the taskbar.

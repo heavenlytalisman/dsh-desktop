@@ -27,14 +27,11 @@ extern "C" fn on_terminate(_signal: libc::c_int) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // WebKitGTK on Wayland: disable DMA-BUF renderer and compositing mode
-    // to fix black glitches in animations (e.g. the dsh whale animation).
+    // WebKitGTK on Wayland: disable DMA-BUF renderer to fix black glitches.
+    // Keep compositing mode enabled for CSS animations (whale animation).
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-    // Performance: disable TPM (reduces overhead), use cairo renderer
-    // (more stable than NGL on some drivers).
+    // Performance: disable TPM (reduces overhead).
     std::env::set_var("WEBKIT_DISABLE_TPM", "1");
-    std::env::set_var("GSK_RENDERER", "cairo");
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGTERM, on_terminate as *const () as libc::sighandler_t);
