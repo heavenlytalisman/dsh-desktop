@@ -78,6 +78,17 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
     // Inject CSS optimizations after the page loads.
     let css = r#"
         (function() {
+            // Force prefers-color-scheme: dark for WebKitGTK
+            const origMatchMedia = window.matchMedia;
+            window.matchMedia = function(q) {
+                if (q === '(prefers-color-scheme: dark)') {
+                    return { matches: true, media: q, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => true };
+                }
+                if (q === '(prefers-color-scheme: light)') {
+                    return { matches: false, media: q, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => true };
+                }
+                return origMatchMedia.call(window, q);
+            };
             const style = document.createElement('style');
             style.id = 'dsh-desktop-opt';
             style.textContent = `
@@ -85,21 +96,17 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
                     -webkit-font-smoothing: antialiased !important;
                     -moz-osx-font-smoothing: grayscale !important;
                     text-rendering: optimizeLegibility !important;
+                    color-scheme: dark !important;
                 }
                 * {
                     -webkit-font-smoothing: antialiased;
                 }
-                /* Smooth scrolling */
                 html, body {
                     scroll-behavior: smooth !important;
+                    background-color: #151517 !important;
                 }
-                /* Reduce motion for performance on lower-end systems */
-                @media (prefers-reduced-motion: reduce) {
-                    *, *::before, *::after {
-                        animation-duration: 0.01ms !important;
-                        animation-iteration-count: 1 !important;
-                        transition-duration: 0.01ms !important;
-                    }
+                :root {
+                    --dsw-alias-bg-base: #151517 !important;
                 }
             `;
             const inject = () => {
@@ -112,7 +119,6 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
             } else {
                 inject();
             }
-            // Re-inject on navigation (SPA route changes)
             const observer = new MutationObserver(() => {
                 if (!document.getElementById('dsh-desktop-opt')) inject();
             });
@@ -126,4 +132,17 @@ pub fn open_main_window(app: &AppHandle, url: &str) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[allow(dead_code)]
+pub fn show_error(app: &AppHandle, message: &str) {
+    if let Some(webview) = app.get_webview("main") {
+        let script = format!(
+            "window.__DSH_SHELL__?.showError({});",
+            serde_json::to_string(message).unwrap_or_else(|_| "\"dsh failed\"".into())
+        );
+        let _ = webview.eval(&script);
+    } else {
+        eprintln!("{message}");
+    }
 }

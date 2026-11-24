@@ -32,6 +32,8 @@ pub fn run() {
     std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     // Performance: disable TPM (reduces overhead).
     std::env::set_var("WEBKIT_DISABLE_TPM", "1");
+    // Force dark theme in WebKitGTK.
+    std::env::set_var("GTK_THEME", "Adwaita:dark");
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGTERM, on_terminate as *const () as libc::sighandler_t);
