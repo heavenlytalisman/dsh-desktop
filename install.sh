@@ -25,6 +25,7 @@ echo "==> $APP_NAME installer"
 echo "    Installs to $INSTALL_DIR (no root required)"
 
 command -v curl >/dev/null 2>&1 || { echo "ERROR: curl is required"; exit 1; }
+mkdir -p "$INSTALL_DIR" "$DESKTOP_DIR"
 
 write_desktop_entry() {
   cat > "$DESKTOP_FILE" <<DESKTOP
@@ -93,7 +94,7 @@ if [ -n "$APP_IMAGE_URL" ]; then
   curl -fsSL "$APP_IMAGE_URL" -o "$TMP_APP"
 
   # Verify SHA256 if a checksum file is available in the release.
-  SHA256_URL="${APP_IMAGE_URL%.AppImage}.sha256"
+  SHA256_URL="${APP_IMAGE_URL}.sha256"
   if curl -fsSL "$SHA256_URL" -o /dev/null 2>/dev/null; then
     EXPECTED_SHA="$(curl -fsSL "$SHA256_URL" | awk '{print $1}')"
     ACTUAL_SHA="$(sha256sum "$TMP_APP" | awk '{print $1}')"
