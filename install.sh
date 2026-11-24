@@ -19,7 +19,13 @@ command -v curl >/dev/null 2>&1 || { echo "ERROR: curl is required"; exit 1; }
 # Resolve the AppImage download URL from the latest GitHub release.
 LATEST_URL="https://api.github.com/repos/${REPO}/releases/latest"
 echo "==> Fetching latest release from $LATEST_URL"
-RELEASE_JSON="$(curl -fsSL "$LATEST_URL")"
+if ! RELEASE_JSON="$(curl -fsSL "$LATEST_URL" 2>/dev/null)"; then
+  echo "ERROR: could not fetch the latest release from $LATEST_URL"
+  echo "       The project may not have published a release yet, or GitHub is unreachable."
+  echo "       Build from source instead:"
+  echo "         pnpm install && pnpm tauri build"
+  exit 1
+fi
 
 APP_IMAGE_URL="$(printf '%s' "$RELEASE_JSON" \
   | grep -o '"browser_download_url": *"[^"]*\.AppImage"' \

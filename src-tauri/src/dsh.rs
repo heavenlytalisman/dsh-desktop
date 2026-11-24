@@ -2,17 +2,27 @@ use std::{
     io::{BufRead, BufReader},
     path::PathBuf,
     process::{Child, Command, Stdio},
+    sync::mpsc,
+    time::Duration,
 };
 
 const URL_PREFIX: &str = "dsh web: ";
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub fn find_dsh() -> Option<PathBuf> {
     if let Ok(path) = which::which("dsh") {
         return Some(path);
     }
-    let home = std::env::var_os("HOME")?;
-    let candidate = PathBuf::from(home).join(".local/bin/dsh");
-    candidate.is_file().then_some(candidate)
+    if let Some(home) = std::env::var_os("HOME") {
+        let candidate = PathBuf::from(home).join(".local/bin/dsh");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    // npm-global installs (fnm/nvm) put dsh next to node.
+    let node = find_node()?;
+    let sibling = node.parent()?.join("dsh");
+    sibling.is_file().then_some(sibling)
 }
 
 /// Find the node binary. dsh is a Node.js script (#!/usr/bin/env node),
@@ -71,10 +81,14 @@ pub fn find_node() -> Option<PathBuf> {
 /// prints. The URL carries the per-process launch token that satisfies the
 /// browser-session fence, so it is loaded directly in the content webview.
 pub fn spawn() -> std::io::Result<(Child, String)> {
+    spawn_with_timeout(STARTUP_TIMEOUT)
+}
+
+fn spawn_with_timeout(timeout: Duration) -> std::io::Result<(Child, String)> {
     let executable = find_dsh().ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            "dsh was not found on PATH or at ~/.local/bin/dsh",
+            "dsh was not found on PATH, at ~/.local/bin/dsh, or next to node",
         )
     })?;
     // Build a PATH that includes node and dsh locations, since desktop
@@ -88,14 +102,12 @@ pub fn spawn() -> std::io::Result<(Child, String)> {
             }
         }
     }
-        if let Some(dsh) = find_dsh() {
-            if let Some(dir) = dsh.parent() {
-                let dir_buf = dir.to_path_buf();
-                if !path_entries.contains(&dir_buf) {
-                    path_entries.push(dir_buf);
-                }
-            }
+    if let Some(dir) = executable.parent() {
+        let dir_buf = dir.to_path_buf();
+        if !path_entries.contains(&dir_buf) {
+            path_entries.push(dir_buf);
         }
+    }
     // Also include common locations
     for dir in ["/usr/local/bin", "/usr/bin", "/bin"] {
         path_entries.push(PathBuf::from(dir));
@@ -114,7 +126,7 @@ pub fn spawn() -> std::io::Result<(Child, String)> {
         .collect::<Vec<_>>()
         .join(":");
 
-    let mut child = Command::new(executable)
+    let mut child = Command::new(&executable)
         .args(["web", "--no-open", "--port", "0"])
         .env("PATH", &new_path)
         .stdout(Stdio::piped())
@@ -124,24 +136,118 @@ pub fn spawn() -> std::io::Result<(Child, String)> {
         .stdout
         .take()
         .ok_or_else(|| std::io::Error::other("dsh stdout was not piped"))?;
-    let mut lines = BufReader::new(stdout).lines();
-    let url = loop {
-        match lines.next() {
-            Some(Ok(line)) => {
+
+    // Read stdout on a helper thread so a silent or slow dsh cannot block us;
+    // the thread keeps draining stdout after the URL is found.
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut sent = false;
+        for line in BufReader::new(stdout).lines() {
+            let Ok(line) = line else { break };
+            if !sent {
                 if let Some(url) = line.trim().strip_prefix(URL_PREFIX) {
-                    break url.trim().to_string();
+                    let _ = tx.send(Ok(url.trim().to_string()));
+                    sent = true;
                 }
             }
-            Some(Err(error)) => return Err(error),
-            None => {
-                let status = child.wait()?;
-                return Err(std::io::Error::other(format!(
-                    "dsh web exited before printing its URL ({status})"
-                )));
-            }
         }
-    };
-    // Drain the rest of stdout so dsh never blocks on a full pipe.
-    std::thread::spawn(move || for _ in lines {});
-    Ok((child, url))
+        if !sent {
+            let _ = tx.send(Err(std::io::Error::other(
+                "dsh web exited before printing its URL",
+            )));
+        }
+    });
+
+    match rx.recv_timeout(timeout) {
+        Ok(Ok(url)) => Ok((child, url)),
+        Ok(Err(error)) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(error)
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!(
+                    "dsh web did not print its URL within {}s",
+                    timeout.as_secs()
+                ),
+            ))
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(std::io::Error::other("dsh web stdout reader stopped"))
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::Mutex;
+
+    // Both tests mutate PATH, so serialize them.
+    static PATH_LOCK: Mutex<()> = Mutex::new(());
+
+    fn install_fake_dsh(script: &str) -> (PathBuf, Option<std::ffi::OsString>) {
+        let dir = std::env::temp_dir().join(format!(
+            "dsh-desktop-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("dsh");
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let old = std::env::var_os("PATH");
+        let prefix = dir.display().to_string();
+        let path = match &old {
+            Some(existing) => format!("{prefix}:{}", existing.to_string_lossy()),
+            None => prefix,
+        };
+        std::env::set_var("PATH", path);
+        (dir, old)
+    }
+
+    fn restore_path(old: Option<std::ffi::OsString>) {
+        match old {
+            Some(value) => std::env::set_var("PATH", value),
+            None => std::env::remove_var("PATH"),
+        }
+    }
+
+    #[test]
+    fn spawn_reads_printed_url() {
+        let _lock = PATH_LOCK.lock().unwrap();
+        let (dir, old_path) = install_fake_dsh(
+            "#!/bin/sh\necho 'dsh web: http://127.0.0.1:4242/?token=abc'\nexec sleep 30\n",
+        );
+        let result = spawn_with_timeout(Duration::from_secs(5));
+        restore_path(old_path);
+
+        let (mut child, url) = result.expect("dsh should start and print a URL");
+        assert_eq!(url, "http://127.0.0.1:4242/?token=abc");
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn spawn_times_out_when_no_url_is_printed() {
+        let _lock = PATH_LOCK.lock().unwrap();
+        let (dir, old_path) = install_fake_dsh("#!/bin/sh\nexec sleep 30\n");
+        let result = spawn_with_timeout(Duration::from_millis(200));
+        restore_path(old_path);
+
+        let error = result.expect_err("a silent dsh must time out");
+        assert_eq!(error.kind(), std::io::ErrorKind::TimedOut);
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

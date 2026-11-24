@@ -36,8 +36,14 @@ pub fn run() {
     std::env::set_var("GTK_THEME", "Adwaita:dark");
     #[cfg(unix)]
     unsafe {
-        libc::signal(libc::SIGTERM, on_terminate as *const () as libc::sighandler_t);
-        libc::signal(libc::SIGINT, on_terminate as *const () as libc::sighandler_t);
+        libc::signal(
+            libc::SIGTERM,
+            on_terminate as *const () as libc::sighandler_t,
+        );
+        libc::signal(
+            libc::SIGINT,
+            on_terminate as *const () as libc::sighandler_t,
+        );
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
@@ -50,18 +56,32 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             tray::create(&handle)?;
-            match dsh::spawn() {
+            // Show the shell window immediately so a slow dsh never looks like
+            // a hung app; dsh is spawned off the main thread.
+            if let Err(error) = chrome::create_main_window(&handle) {
+                eprintln!("failed to open main window: {error}");
+            }
+            std::thread::spawn(move || match dsh::spawn() {
                 Ok((child, url)) => {
                     DSH_PID.store(child.id() as i32, Ordering::SeqCst);
                     if let Some(state) = handle.try_state::<DshChild>() {
                         *state.0.lock().expect("dsh child lock poisoned") = Some(child);
                     }
-                    if let Err(error) = chrome::open_main_window(&handle, &url) {
-                        eprintln!("failed to open main window: {error}");
-                    }
+                    let main = handle.clone();
+                    let _ = handle.run_on_main_thread(move || {
+                        if let Err(error) = chrome::navigate_to(&main, &url) {
+                            eprintln!("failed to load dsh: {error}");
+                            chrome::show_error(&main, &format!("Failed to load dsh: {error}"));
+                        }
+                    });
                 }
-                Err(error) => eprintln!("failed to spawn dsh: {error}"),
-            }
+                Err(error) => {
+                    eprintln!("failed to spawn dsh: {error}");
+                    let main = handle.clone();
+                    let message = format!("Failed to start dsh: {error}");
+                    let _ = handle.run_on_main_thread(move || chrome::show_error(&main, &message));
+                }
+            });
             Ok(())
         })
         .build(tauri::generate_context!())
